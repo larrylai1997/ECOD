@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# runtime artefacts
+edge/temp/
+edge/cache/
+edge/det_txt/
+edge/features.csv
+edge/result_bw.csv
+edge/result_bw.txt
+
+server/fused_txt/
+server/server_temp/
+server/server.log
+server/low_img.txt
+server/high_img.txt
+
+# data / weights (not distributed)
+data/
+models/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
