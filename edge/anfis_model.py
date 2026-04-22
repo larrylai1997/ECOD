@@ -75,9 +75,35 @@ if HAS_TORCH:
 
             result = torch.stack(outputs, dim=1)
 
-            result = torch.sigmoid(result)
-
             return result
+
+        def compute_normalized_strengths(self, x):
+            x_expanded = x.unsqueeze(2)
+            sigmas = torch.exp(self.log_sigmas)
+            mu = torch.exp(-0.5 * ((x_expanded - self.centers) / sigmas) ** 2)
+            rule_strengths = self._compute_rule_strengths(mu)
+            w_sum = rule_strengths.sum(dim=1, keepdim=True).clamp(min=1e-8)
+            return rule_strengths / w_sum
+
+        def build_lse_design(self, x):
+            batch_size = x.shape[0]
+            w_bar = self.compute_normalized_strengths(x)
+            x_aug = torch.cat(
+                [x, torch.ones(batch_size, 1, device=x.device)], dim=1)
+
+            A = w_bar.unsqueeze(2) * x_aug.unsqueeze(1)
+            return A.reshape(batch_size, -1)
+
+        def update_consequent_lse(self, A, Y, reg=1e-4):
+            n_feat = A.shape[1]
+            AtA = A.T @ A + reg * torch.eye(n_feat, device=A.device)
+            AtY = A.T @ Y
+            p = torch.linalg.solve(AtA, AtY)
+
+            p_reshaped = p.T.reshape(
+                self.n_outputs, self.n_rules, self.n_inputs + 1)
+            with torch.no_grad():
+                self.consequent.data.copy_(p_reshaped)
 
         def _compute_rule_strengths(self, mu):
             batch_size = mu.shape[0]
@@ -140,11 +166,8 @@ class ANFISInference:
             out = np.dot(w_bar, f_k)
             outputs.append(out)
 
-        def sigmoid(v):
-            return 1.0 / (1.0 + math.exp(-v))
-
-        lt = sigmoid(outputs[0])
-        ut = sigmoid(outputs[1])
+        lt = float(outputs[0])
+        ut = float(outputs[1])
         return lt, ut
 
     @classmethod
